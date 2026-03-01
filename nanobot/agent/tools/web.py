@@ -10,9 +10,8 @@ import httpx
 
 from nanobot.agent.tools.base import Tool
 
-# Shared constants
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_2) AppleWebKit/537.36"
-MAX_REDIRECTS = 5  # Limit redirects to prevent DoS attacks
+MAX_REDIRECTS = 5
 
 
 def _strip_tags(text: str) -> str:
@@ -44,9 +43,9 @@ def _validate_url(url: str) -> tuple[bool, str]:
 
 class WebFetchTool(Tool):
     """Fetch and extract content from a URL using Readability."""
-    
+
     name = "web_fetch"
-    description = "Fetch URL and extract readable content (HTML → markdown/text)."
+    description = "Fetch URL and extract readable content (HTML -> markdown/text)."
     parameters = {
         "type": "object",
         "properties": {
@@ -56,16 +55,15 @@ class WebFetchTool(Tool):
         },
         "required": ["url"]
     }
-    
+
     def __init__(self, max_chars: int = 50000):
         self.max_chars = max_chars
-    
+
     async def execute(self, url: str, extractMode: str = "markdown", maxChars: int | None = None, **kwargs: Any) -> str:
         from readability import Document
 
         max_chars = maxChars or self.max_chars
 
-        # Validate URL before fetching
         is_valid, error_msg = _validate_url(url)
         if not is_valid:
             return json.dumps({"error": f"URL validation failed: {error_msg}", "url": url}, ensure_ascii=False)
@@ -74,17 +72,15 @@ class WebFetchTool(Tool):
             async with httpx.AsyncClient(
                 follow_redirects=True,
                 max_redirects=MAX_REDIRECTS,
-                timeout=30.0
+                timeout=30.0,
             ) as client:
                 r = await client.get(url, headers={"User-Agent": USER_AGENT})
                 r.raise_for_status()
-            
+
             ctype = r.headers.get("content-type", "")
-            
-            # JSON
+
             if "application/json" in ctype:
                 text, extractor = json.dumps(r.json(), indent=2, ensure_ascii=False), "json"
-            # HTML
             elif "text/html" in ctype or r.text[:256].lower().startswith(("<!doctype", "<html")):
                 doc = Document(r.text)
                 content = self._to_markdown(doc.summary()) if extractMode == "markdown" else _strip_tags(doc.summary())
@@ -92,19 +88,25 @@ class WebFetchTool(Tool):
                 extractor = "readability"
             else:
                 text, extractor = r.text, "raw"
-            
+
             truncated = len(text) > max_chars
             if truncated:
                 text = text[:max_chars]
-            
-            return json.dumps({"url": url, "finalUrl": str(r.url), "status": r.status_code,
-                              "extractor": extractor, "truncated": truncated, "length": len(text), "text": text}, ensure_ascii=False)
+
+            return json.dumps({
+                "url": url,
+                "finalUrl": str(r.url),
+                "status": r.status_code,
+                "extractor": extractor,
+                "truncated": truncated,
+                "length": len(text),
+                "text": text,
+            }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"error": str(e), "url": url}, ensure_ascii=False)
-    
+
     def _to_markdown(self, html: str) -> str:
         """Convert HTML to markdown."""
-        # Convert links, headings, lists before stripping tags
         text = re.sub(r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>([\s\S]*?)</a>',
                       lambda m: f'[{_strip_tags(m[2])}]({m[1]})', html, flags=re.I)
         text = re.sub(r'<h([1-6])[^>]*>([\s\S]*?)</h\1>',
