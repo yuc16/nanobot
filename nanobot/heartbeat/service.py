@@ -89,9 +89,20 @@ class HeartbeatService:
         """
         response = await self.provider.chat(
             messages=[
-                {"role": "system", "content": "You are a heartbeat agent. Call the heartbeat tool to report your decision."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a heartbeat agent. Review HEARTBEAT.md, decide whether "
+                        "it contains actionable tasks, and call the heartbeat tool to "
+                        "report your decision. Return action=run whenever there is any "
+                        "concrete task to execute; only return action=skip when there "
+                        "is nothing actionable."
+                    ),
+                },
                 {"role": "user", "content": (
-                    "Review the following HEARTBEAT.md and decide whether there are active tasks.\n\n"
+                    "Review the following HEARTBEAT.md. If it contains actionable tasks, "
+                    "return action=run with a concise task summary for autonomous execution. "
+                    "Only return action=skip when there is nothing actionable.\n\n"
                     f"{content}"
                 )},
             ],

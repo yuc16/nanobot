@@ -228,6 +228,14 @@ class AgentLoop:
                     messages = self.context.add_tool_result(
                         messages, tool_call.id, tool_call.name, result
                     )
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Review the tool results and continue working toward the goal. "
+                        "Use more tools if needed. Only stop (without calling a tool) "
+                        "when the task is fully complete."
+                    ),
+                })
             else:
                 clean = self._strip_think(response.content)
                 # Don't persist error responses to session history — they can
