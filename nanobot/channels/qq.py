@@ -1,6 +1,7 @@
 """QQ channel implementation using botpy SDK."""
 
 import asyncio
+import re
 from collections import deque
 from typing import TYPE_CHECKING
 
@@ -102,14 +103,23 @@ class QQChannel(BaseChannel):
             return
         try:
             msg_id = msg.metadata.get("message_id")
+            content = self._sanitize_content(msg.content)
             await self._client.api.post_c2c_message(
                 openid=msg.chat_id,
                 msg_type=0,
-                content=msg.content,
+                content=content,
                 msg_id=msg_id,
             )
         except Exception as e:
             logger.error("Error sending QQ message: {}", e)
+
+    @staticmethod
+    def _sanitize_content(content: str) -> str:
+        """Strip URLs from QQ messages to satisfy platform restrictions."""
+        sanitized = re.sub(r"https?://\S+", "[链接已省略]", content)
+        if sanitized != content:
+            logger.warning("QQ message contained URL(s); stripped before sending")
+        return sanitized or "[内容为空]"
 
     async def _on_message(self, data: "C2CMessage") -> None:
         """Handle incoming message from QQ."""
